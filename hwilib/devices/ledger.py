@@ -207,8 +207,8 @@ class LedgerClient(HardwareWalletClient):
 
         - Only keys derived with standard BIP 44, 49, 84, and 86 derivation paths are supported for single signature addresses.
         """
-        if registered_descriptors:
-            raise UnavailableActionError("The Ledger does not support BIP388 policy signing")
+        if registered_descriptors and isinstance(self.client, LegacyClient):
+            raise UnavailableActionError("Legacy Ledger app does not support BIP388 policy signing")
         master_fp = self.get_master_fingerprint()
 
         def legacy_sign_tx() -> PSBT:
@@ -234,6 +234,25 @@ class LedgerClient(HardwareWalletClient):
 
         # Figure out which wallets are signing
         wallets: Dict[bytes, Tuple[int, AddressType, WalletPolicy, Optional[bytes]]] = {}
+        for registered_descriptor in sorted(
+            registered_descriptors or set(),
+            key=lambda registration: registration.serialize(),
+        ):
+            descriptor = registered_descriptor.descriptor
+            registered_wallet = WalletPolicy(
+                registered_descriptor.name,
+                descriptor.get_bip388_template(),
+                [p.get_bip388_key_info() for p in descriptor.get_pubkey_providers()],
+            )
+            registered_addrtype = descriptor.get_address_type()
+            if registered_addrtype is None:
+                raise BadArgumentError("Registered descriptor does not have an address type")
+            wallets[registered_wallet.id] = (
+                signing_priority[registered_addrtype],
+                registered_addrtype,
+                registered_wallet,
+                registered_descriptor.registration,
+            )
         pubkeys: Dict[int, bytes] = {}
         for input_num, psbt_in in builtins.enumerate(psbt2.inputs):
             utxo = None
