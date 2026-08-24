@@ -71,7 +71,7 @@
             ]
         },
         {
-            "regexp": "^(Accept|Approve|Continue|Sign message|Sign transaction|Register account).*",
+            "regexp": "^(Accept|Approve|Continue|Sign message|Sign transaction|Register account|Account registered|Address verified|Transaction signed).*",
             "actions": [
                 [ "button", 3, true ],
                 [ "button", 3, false ]
