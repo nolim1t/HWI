@@ -56,8 +56,22 @@
             ]
         },
         {
+            "regexp": "^To \\([0-9]+/[0-9]+\\)$",
+            "actions": [
+                [ "button", 2, true ],
+                [ "button", 2, false ]
+            ]
+        },
+        {
             "regexp": "^To.*",
             "y": 3,
+            "actions": [
+                [ "button", 2, true ],
+                [ "button", 2, false ]
+            ]
+        },
+        {
+            "regexp": "^From$",
             "actions": [
                 [ "button", 2, true ],
                 [ "button", 2, false ]
