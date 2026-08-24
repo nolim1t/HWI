@@ -17,7 +17,7 @@ from .key import (
     multipath_to_string,
     path_to_string,
 )
-from .common import AddressType, hash160, sha256
+from .common import AddressType
 from .errors import BadArgumentError, InvalidPolicyError
 from ._serialize import (
     deser_compact_size,
@@ -28,7 +28,6 @@ from ._serialize import (
 
 from base64 import b64decode, b64encode
 from binascii import unhexlify
-from collections import namedtuple
 from copy import deepcopy
 from enum import Enum
 from io import BufferedReader, BytesIO
@@ -41,8 +40,6 @@ from typing import (
 
 MAX_TAPROOT_NODES = 128
 
-
-ExpandedScripts = namedtuple("ExpandedScripts", ["output_script", "redeem_script", "witness_script"])
 
 def PolyMod(c: int, val: int) -> int:
     """
@@ -315,12 +312,6 @@ class Descriptor(object):
         """
         return AddChecksum(self.to_string_no_checksum(hardened_char))
 
-    def expand(self, pos: int) -> "ExpandedScripts":
-        """
-        Returns the scripts for a descriptor at the given `pos` for ranged descriptors.
-        """
-        raise NotImplementedError("The Descriptor base class does not implement this method")
-
     def get_address_type(self) -> Optional[AddressType]:
         """Return the address type, or ``None`` for descriptors without an address encoding."""
         return None
@@ -398,10 +389,6 @@ class PKHDescriptor(Descriptor):
         """
         super().__init__([pubkey], [], "pkh")
 
-    def expand(self, pos: int) -> "ExpandedScripts":
-        script = b"\x76\xa9\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos)) + b"\x88\xac"
-        return ExpandedScripts(script, None, None)
-
     def get_address_type(self) -> Optional[AddressType]:
         return AddressType.LEGACY
 
@@ -418,10 +405,6 @@ class WPKHDescriptor(Descriptor):
         :param pubkey: The :class:`PubkeyProvider` for this descriptor
         """
         super().__init__([pubkey], [], "wpkh")
-
-    def expand(self, pos: int) -> "ExpandedScripts":
-        script = b"\x00\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos))
-        return ExpandedScripts(script, None, None)
 
     def get_address_type(self) -> Optional[AddressType]:
         return AddressType.WIT
@@ -449,22 +432,6 @@ class MultisigDescriptor(Descriptor):
     def to_string_no_checksum(self, hardened_char: str = "h") -> str:
         return "{}({},{})".format(self.name, self.thresh, ",".join([p.to_string(hardened_char) for p in self.pubkeys]))
 
-    def expand(self, pos: int) -> "ExpandedScripts":
-        if self.thresh > 16:
-            m = b"\x01" + self.thresh.to_bytes(1, "big")
-        else:
-            m = (self.thresh + 0x50).to_bytes(1, "big") if self.thresh > 0 else b"\x00"
-        n = (len(self.pubkeys) + 0x50).to_bytes(1, "big") if len(self.pubkeys) > 0 else b"\x00"
-        script: bytes = m
-        der_pks = [p.get_pubkey_bytes(pos) for p in self.pubkeys]
-        if self.is_sorted:
-            der_pks.sort()
-        for pk in der_pks:
-            script += len(pk).to_bytes(1, "big") + pk
-        script += n + b"\xae"
-
-        return ExpandedScripts(script, None, None)
-
     def get_bip388_template(self) -> str:
         return "{}({},{})".format(self.name, self.thresh, ",".join([p.get_bip388_placeholder() for p in self.pubkeys]))
 
@@ -481,12 +448,6 @@ class SHDescriptor(Descriptor):
         :param subdescriptor: The :class:`Descriptor` that is a sub-descriptor for this descriptor
         """
         super().__init__([], [subdescriptor], "sh")
-
-    def expand(self, pos: int) -> "ExpandedScripts":
-        assert len(self.subdescriptors) == 1
-        redeem_script, _, witness_script = self.subdescriptors[0].expand(pos)
-        script = b"\xa9\x14" + hash160(redeem_script) + b"\x87"
-        return ExpandedScripts(script, redeem_script, witness_script)
 
     def get_address_type(self) -> Optional[AddressType]:
         if self.subdescriptors[0].get_address_type() is AddressType.WIT:
@@ -506,12 +467,6 @@ class WSHDescriptor(Descriptor):
         :param subdescriptor: The :class:`Descriptor` that is a sub-descriptor for this descriptor
         """
         super().__init__([], [subdescriptor], "wsh")
-
-    def expand(self, pos: int) -> "ExpandedScripts":
-        assert len(self.subdescriptors) == 1
-        witness_script, _, _ = self.subdescriptors[0].expand(pos)
-        script = b"\x00\x20" + sha256(witness_script)
-        return ExpandedScripts(script, None, witness_script)
 
     def get_address_type(self) -> Optional[AddressType]:
         return AddressType.WIT
