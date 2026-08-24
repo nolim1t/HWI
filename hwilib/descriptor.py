@@ -17,7 +17,7 @@ from .key import (
     multipath_to_string,
     path_to_string,
 )
-from .common import hash160, sha256
+from .common import AddressType, hash160, sha256
 from .errors import BadArgumentError, InvalidPolicyError
 from ._serialize import (
     deser_compact_size,
@@ -321,6 +321,10 @@ class Descriptor(object):
         """
         raise NotImplementedError("The Descriptor base class does not implement this method")
 
+    def get_address_type(self) -> Optional[AddressType]:
+        """Return the address type, or ``None`` for descriptors without an address encoding."""
+        return None
+
     def get_bip388_template(self) -> str:
         """
         Get the BIP 388 Wallet Descriptor Template string for this descriptor.
@@ -398,6 +402,9 @@ class PKHDescriptor(Descriptor):
         script = b"\x76\xa9\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos)) + b"\x88\xac"
         return ExpandedScripts(script, None, None)
 
+    def get_address_type(self) -> Optional[AddressType]:
+        return AddressType.LEGACY
+
 
 class WPKHDescriptor(Descriptor):
     """
@@ -415,6 +422,9 @@ class WPKHDescriptor(Descriptor):
     def expand(self, pos: int) -> "ExpandedScripts":
         script = b"\x00\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos))
         return ExpandedScripts(script, None, None)
+
+    def get_address_type(self) -> Optional[AddressType]:
+        return AddressType.WIT
 
 
 class MultisigDescriptor(Descriptor):
@@ -478,6 +488,11 @@ class SHDescriptor(Descriptor):
         script = b"\xa9\x14" + hash160(redeem_script) + b"\x87"
         return ExpandedScripts(script, redeem_script, witness_script)
 
+    def get_address_type(self) -> Optional[AddressType]:
+        if self.subdescriptors[0].get_address_type() is AddressType.WIT:
+            return AddressType.SH_WIT
+        return AddressType.LEGACY
+
 
 class WSHDescriptor(Descriptor):
     """
@@ -498,6 +513,9 @@ class WSHDescriptor(Descriptor):
         script = b"\x00\x20" + sha256(witness_script)
         return ExpandedScripts(script, None, witness_script)
 
+    def get_address_type(self) -> Optional[AddressType]:
+        return AddressType.WIT
+
 
 class TRDescriptor(Descriptor):
     """
@@ -516,6 +534,9 @@ class TRDescriptor(Descriptor):
         """
         super().__init__([internal_key], subdescriptors, "tr")
         self.depths = depths
+
+    def get_address_type(self) -> Optional[AddressType]:
+        return AddressType.TAP
 
     def to_string_no_checksum(self, hardened_char: str = "h") -> str:
         r = f"{self.name}({self.pubkeys[0].to_string(hardened_char)}"

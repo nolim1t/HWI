@@ -9,6 +9,7 @@ from hwilib.descriptor import (
     WPKHDescriptor,
     WSHDescriptor,
 )
+from hwilib.common import AddressType
 from hwilib.errors import InvalidPolicyError
 
 from binascii import unhexlify
@@ -30,6 +31,23 @@ class TestDescriptor(unittest.TestCase):
             "wsh(multi(1,{0}/2/7,{0}/12/7))".format(xpub),
         )
         self.assertEqual(descriptor.to_string_no_checksum(), descriptor_str)
+
+    def test_get_address_type(self):
+        key = "02c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c7"
+        descriptors = {
+            f"pk({key})": None,
+            f"multi(1,{key})": None,
+            f"pkh({key})": AddressType.LEGACY,
+            f"sh(multi(1,{key}))": AddressType.LEGACY,
+            f"wpkh({key})": AddressType.WIT,
+            f"wsh(multi(1,{key}))": AddressType.WIT,
+            f"sh(wpkh({key}))": AddressType.SH_WIT,
+            f"sh(wsh(multi(1,{key})))": AddressType.SH_WIT,
+            f"tr({key})": AddressType.TAP,
+        }
+        for descriptor, address_type in descriptors.items():
+            with self.subTest(descriptor=descriptor):
+                self.assertEqual(parse_descriptor(descriptor).get_address_type(), address_type)
 
     def test_parse_descriptor_with_origin(self):
         d = "wpkh([00000001/84h/1h/0h]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0)"
