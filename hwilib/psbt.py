@@ -289,9 +289,10 @@ class PartiallySignedInput:
                 v = deser_string(f)
                 if len(v) != 4:
                     raise PSBTSerializationError("Input time based locktime is not 4 bytes")
-                self.time_locktime = struct.unpack("<I", v)[0]
-                if self.time_locktime < 500000000:
+                time_locktime = struct.unpack("<I", v)[0]
+                if time_locktime < 500000000:
                     raise PSBTSerializationError("Input time based locktime is less than 500000000")
+                self.time_locktime = time_locktime
             elif key_type == PartiallySignedInput.PSBT_IN_REQUIRED_HEIGHT_LOCKTIME:
                 if self.version == 0:
                     raise PSBTSerializationError("PSBT_IN_REQUIRED_HEIGHT_LOCKTIME is not allowed in PSBTv0")
@@ -302,9 +303,10 @@ class PartiallySignedInput:
                 v = deser_string(f)
                 if len(v) != 4:
                     raise PSBTSerializationError("Input height based locktime is not 4 bytes")
-                self.height_locktime = struct.unpack("<I", v)[0]
-                if self.height_locktime == 0 or self.height_locktime >= 500000000:
+                height_locktime = struct.unpack("<I", v)[0]
+                if height_locktime == 0 or height_locktime >= 500000000:
                     raise PSBTSerializationError("Input height based locktime is not greater than 0 and less than 500000000")
+                self.height_locktime = height_locktime
             elif key_type == PartiallySignedInput.PSBT_IN_TAP_KEY_SIG:
                 if key in key_lookup:
                     raise PSBTSerializationError("Duplicate key, input Taproot key signature already provided")
@@ -1072,7 +1074,7 @@ class PSBT(object):
         if self.version == 0:
             self.setup_from_tx(self.tx)
 
-    def setup_from_tx(self, tx: CTransaction):
+    def setup_from_tx(self, tx: CTransaction) -> None:
         """
         Fills in the PSBTv2 fields for this PSBT given a transaction
 
@@ -1159,7 +1161,7 @@ class PSBT(object):
         tx.rehash()
         return tx
 
-    def _convert_version(self, version) -> None:
+    def _convert_version(self, version: int) -> None:
         self.version = version
         for psbt_in in self.inputs:
             psbt_in.version = version
