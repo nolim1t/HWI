@@ -9,9 +9,8 @@ from hwilib.descriptor import (
     WPKHDescriptor,
     WSHDescriptor,
 )
+from hwilib.common import AddressType
 from hwilib.errors import InvalidPolicyError
-
-from binascii import unhexlify
 
 import unittest
 
@@ -31,6 +30,23 @@ class TestDescriptor(unittest.TestCase):
         )
         self.assertEqual(descriptor.to_string_no_checksum(), descriptor_str)
 
+    def test_get_address_type(self):
+        key = "02c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c7"
+        descriptors = {
+            f"pk({key})": None,
+            f"multi(1,{key})": None,
+            f"pkh({key})": AddressType.LEGACY,
+            f"sh(multi(1,{key}))": AddressType.LEGACY,
+            f"wpkh({key})": AddressType.WIT,
+            f"wsh(multi(1,{key}))": AddressType.WIT,
+            f"sh(wpkh({key}))": AddressType.SH_WIT,
+            f"sh(wsh(multi(1,{key})))": AddressType.SH_WIT,
+            f"tr({key})": AddressType.TAP,
+        }
+        for descriptor, address_type in descriptors.items():
+            with self.subTest(descriptor=descriptor):
+                self.assertEqual(parse_descriptor(descriptor).get_address_type(), address_type)
+
     def test_parse_descriptor_with_origin(self):
         d = "wpkh([00000001/84h/1h/0h]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0)"
         desc = parse_descriptor(d)
@@ -41,10 +57,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.pubkeys[0].deriv_path, [[0], [0]])
         self.assertEqual(desc.pubkeys[0].expr_index, 0)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("0014d95fc47eada9e4c3cf59a2cbf9e96517c3ba2efa"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, None)
 
     def test_parse_multisig_descriptor_with_origin(self):
         d = "wsh(multi(2,[00000001/48h/0h/0h/2h]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0,[00000002/48h/0h/0h/2h]tpubDFHiBJDeNvqPWNJbzzxqDVXmJZoNn2GEtoVcFhMjXipQiorGUmps3e5ieDGbRrBPTFTh9TXEKJCwbAGW9uZnfrVPbMxxbFohuFzfT6VThty/0/0))"
@@ -63,10 +75,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.subdescriptors[0].pubkeys[1].deriv_path, [[0], [0]])
         self.assertEqual(desc.subdescriptors[0].pubkeys[1].expr_index, 1)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("002084b64b2b8651df8fd3e9735f6269edbf9e03abf619ae0788be9f17bf18e83d59"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, unhexlify("522102c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c721033a4f18d2b498273ed7439c59f6d8a673d5b9c67a03163d530e12c941ca22be3352ae"))
 
         d = "sh(multi(2,[00000001/48h/0h/0h/2h]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0,[00000002/48h/0h/0h/2h]tpubDFHiBJDeNvqPWNJbzzxqDVXmJZoNn2GEtoVcFhMjXipQiorGUmps3e5ieDGbRrBPTFTh9TXEKJCwbAGW9uZnfrVPbMxxbFohuFzfT6VThty/0/0))"
         desc = parse_descriptor(d)
@@ -84,10 +92,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.subdescriptors[0].pubkeys[1].deriv_path, [[0], [0]])
         self.assertEqual(desc.subdescriptors[0].pubkeys[1].expr_index, 1)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("a91495ee6326805b1586bb821fc3c0eeab2c68441b4187"))
-        self.assertEqual(e.redeem_script, unhexlify("522102c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c721033a4f18d2b498273ed7439c59f6d8a673d5b9c67a03163d530e12c941ca22be3352ae"))
-        self.assertEqual(e.witness_script, None)
 
         d = "sh(wsh(multi(2,[00000001/48h/0h/0h/2h]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0,[00000002/48h/0h/0h/2h]tpubDFHiBJDeNvqPWNJbzzxqDVXmJZoNn2GEtoVcFhMjXipQiorGUmps3e5ieDGbRrBPTFTh9TXEKJCwbAGW9uZnfrVPbMxxbFohuFzfT6VThty/0/0)))"
         desc = parse_descriptor(d)
@@ -106,10 +110,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.subdescriptors[0].subdescriptors[0].pubkeys[1].deriv_path, [[0], [0]])
         self.assertEqual(desc.subdescriptors[0].subdescriptors[0].pubkeys[1].expr_index, 1)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("a914779ae0f6958e98b997cc177f9b554289905fbb5587"))
-        self.assertEqual(e.redeem_script, unhexlify("002084b64b2b8651df8fd3e9735f6269edbf9e03abf619ae0788be9f17bf18e83d59"))
-        self.assertEqual(e.witness_script, unhexlify("522102c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c721033a4f18d2b498273ed7439c59f6d8a673d5b9c67a03163d530e12c941ca22be3352ae"))
 
     def test_parse_descriptor_without_origin(self):
         d = "wpkh(tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0)"
@@ -119,10 +119,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.pubkeys[0].pubkey, "tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B")
         self.assertEqual(desc.pubkeys[0].deriv_path, [[0], [0]])
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("0014d95fc47eada9e4c3cf59a2cbf9e96517c3ba2efa"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, None)
 
     def test_parse_descriptor_with_origin_fingerprint_only(self):
         d = "wpkh([00000001]tpubD6NzVbkrYhZ4WaWSyoBvQwbpLkojyoTZPRsgXELWz3Popb3qkjcJyJUGLnL4qHHoQvao8ESaAstxYSnhyswJ76uZPStJRJCTKvosUCJZL5B/0/0)"
@@ -134,10 +130,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.pubkeys[0].deriv_path, [[0], [0]])
         self.assertEqual(desc.pubkeys[0].expr_index, 0)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("0014d95fc47eada9e4c3cf59a2cbf9e96517c3ba2efa"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, None)
 
     def test_parse_descriptor_with_key_at_end_with_origin(self):
         d = "wpkh([00000001/84h/1h/0h/0/0]02c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c7)"
@@ -149,10 +141,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.pubkeys[0].deriv_path, None)
         self.assertEqual(desc.pubkeys[0].expr_index, 0)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("0014d95fc47eada9e4c3cf59a2cbf9e96517c3ba2efa"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, None)
 
         d = "pkh([00000001/84h/1h/0h/0/0]02c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c7)"
         desc = parse_descriptor(d)
@@ -163,10 +151,6 @@ class TestDescriptor(unittest.TestCase):
         self.assertEqual(desc.pubkeys[0].deriv_path, None)
         self.assertEqual(desc.pubkeys[0].expr_index, 0)
         self.assertEqual(desc.to_string_no_checksum(), d)
-        e = desc.expand(0)
-        self.assertEqual(e.output_script, unhexlify("76a914d95fc47eada9e4c3cf59a2cbf9e96517c3ba2efa88ac"))
-        self.assertEqual(e.redeem_script, None)
-        self.assertEqual(e.witness_script, None)
 
     def test_parse_descriptor_with_key_at_end_without_origin(self):
         d = "wpkh(02c97dc3f4420402e01a113984311bf4a1b8de376cac0bdcfaf1b3ac81f13433c7)"

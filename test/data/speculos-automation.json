@@ -56,8 +56,22 @@
             ]
         },
         {
+            "regexp": "^To \\([0-9]+/[0-9]+\\)$",
+            "actions": [
+                [ "button", 2, true ],
+                [ "button", 2, false ]
+            ]
+        },
+        {
             "regexp": "^To.*",
             "y": 3,
+            "actions": [
+                [ "button", 2, true ],
+                [ "button", 2, false ]
+            ]
+        },
+        {
+            "regexp": "^From$",
             "actions": [
                 [ "button", 2, true ],
                 [ "button", 2, false ]
@@ -71,7 +85,7 @@
             ]
         },
         {
-            "regexp": "^(Accept|Approve|Continue|Sign message|Sign transaction|Register account).*",
+            "regexp": "^(Accept|Approve|Continue|Sign message|Sign transaction|Register account|Account registered|Address verified|Transaction signed).*",
             "actions": [
                 [ "button", 3, true ],
                 [ "button", 3, false ]
